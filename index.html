@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pemutar Video YouTube Otomatis Aman</title> 
+    
+    <style>
+        :root {
+            /* Variabel Warna */
+            --warna-utama: #1f4287; 
+            --warna-aksen: #ff7f50; 
+            --warna-latar: #f4f7f6;
+            --warna-kartu: #ffffff;
+            --warna-teks: #333333;
+            --warna-teks-muda: #777777;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--warna-latar);
+            color: var(--warna-teks);
+            /* Pastikan ada ruang untuk scroll, tambahkan padding besar di bawah */
+            padding-bottom: 500px; 
+        }
+
+        .container {
+            min-height: 100vh;
+        }
+
+        .main-content {
+            width: 100%; 
+            padding: 40px;
+            box-sizing: border-box; 
+        }
+
+        .header {
+            margin-bottom: 30px;
+            border-bottom: 2px solid #ddd;
+            padding-bottom: 10px;
+        }
+
+        .header h1 {
+            margin: 0;
+            color: var(--warna-utama);
+        }
+
+        /* Video Player Styling */
+        .video-container {
+            background-color: var(--warna-kartu);
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            margin-top: 30px;
+        }
+        
+        .video-container h2 {
+            color: var(--warna-utama);
+            margin-top: 0;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        #player {
+            width: 100%;
+            aspect-ratio: 16 / 9; 
+            margin-bottom: 15px;
+            background-color: #000;
+        } 
+.player-vertical {
+            /* Rasio aspek 9:16 (Vertikal) */
+            aspect-ratio: 9 / 16; 
+            /* Batasi lebarnya di desktop agar tidak terlalu besar */
+            max-width: 450px; 
+            /* Pusatkan pemutar vertikal */
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .control-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+        }
+
+        #start-watch-btn {
+            background-color: var(--warna-aksen);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s, opacity 0.3s;
+        }
+
+        #start-watch-btn:hover:not([disabled]) {
+            background-color: #e56d44;
+        }
+
+        #start-watch-btn[disabled] {
+            cursor: not-allowed;
+            background-color: #ff7f50;
+            opacity: 0.6;
+        }
+        
+        #status-text {
+            font-weight: bold;
+            color: var(--warna-teks-muda);
+        }
+
+        .url-input-area {
+            display: flex; 
+            gap: 10px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+
+        #video-url-input {
+            flex-grow: 1; 
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+
+        #load-video-btn {
+            background-color: var(--warna-utama); 
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+
+        #load-video-btn:hover {
+            background-color: #1a366e;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <main class="main-content">
+            <header class="header">
+                <h1>Pemutar Video YouTube Otomatis</h1>
+                <p>Fitur Otomatisasi aktif: Putar ulang video tunggal atau *loop* *playlist* tanpa klik berulang.</p>
+            </header>
+
+            <div class="video-container">
+                <h2>Pemutar YouTube</h2>
+
+                <div class="url-input-area">
+                    <input type="text" id="video-url-input" placeholder="Masukkan URL Video atau Playlist YouTube (cth: https://www.youtube.com/watch?v=...&list=...)">
+                    <button id="load-video-btn">Muat Konten</button>
+                </div>
+                <div id="player"></div>
+
+                <div class="control-panel">
+                    <p id="status-text">Status: Siap Memuat Video. Harap Muat Konten Dahulu.</p>
+                    <button id="start-watch-btn">Aktifkan Otomatis</button>
+                </div>
+            </div>
+            
+            <div style="height: 1000px; padding-top: 50px;">
+                <p style="color: var(--warna-teks-muda);">Area kosong ini ditambahkan untuk memastikan halaman memiliki ruang yang cukup untuk fitur gulir otomatis. Gulir akan meniru aktivitas manusia yang sedang membaca atau menjelajah.</p>
+            </div>
+        </main>
+    </div>
+
+    
+           <script src="script.js"></script>
+
+</body>
+</html>
+
