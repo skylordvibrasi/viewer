@@ -247,7 +247,7 @@ function loadContentFromUrl(url, fromAutoStart = false) {
         });
         player.setPlaybackRate(getRandomPlaybackRate());
 
-        statusText.textContent = fromAutoStart ? 'Status: Playlist otomatis dimuat ulang (Acak).' : 'Status: Playlist dimuat (Acak). Klik "Aktifkan Otomatis".';
+        statusText.textContent = fromAutoStart ? 'Status: Playlist otomatis dimuat ulang (Acak).' : 'Status: Playlist dimuat. Klik "Aktifkan Otomatis".';
         
     } else if (newVideoId) {
         currentVideoId = newVideoId;
@@ -272,6 +272,19 @@ function loadContentFromUrl(url, fromAutoStart = false) {
 
     watchBtn.textContent = 'Aktifkan Otomatis'; 
     watchBtn.disabled = false;
+
+    // --- PERBAIKAN: JEDA PAKSA SETELAH MUAT KONTEN BARU SECARA MANUAL ---
+    // Ini memastikan video tidak langsung berjalan ketika pengguna memuat URL baru, 
+    // kecuali jika berasal dari AutoStart (setelah refresh)
+    if (!fromAutoStart && player && typeof player.pauseVideo === 'function') {
+         player.pauseVideo();
+         statusText.textContent = isPlaylistMode 
+            ? 'Status: Playlist dimuat. Klik "Aktifkan Otomatis" untuk memulai.' 
+            : 'Status: Video dimuat. Klik "Aktifkan Otomatis" untuk memulai.';
+         statusText.style.color = 'var(--warna-teks-muda)'; 
+    }
+    // -------------------------------------------------------------------
+
     return true;
 }
 
@@ -311,6 +324,7 @@ function onPlayerReady(event) {
     const storedAutoMode = localStorage.getItem(LS_KEY_AUTO_MODE) === 'true';
     
     if (storedUrl) {
+         // Muat konten dengan flag 'fromAutoStart = true'
          loadContentFromUrl(storedUrl, true);
     }
     
@@ -333,7 +347,9 @@ function startAutoPlaybackWithDelay() {
     statusText.style.color = 'blue';
 
     autoTimeout = setTimeout(() => {
-        if (player && typeof player.playVideo === 'function' && player.getPlayerState() === YT.PlayerState.CUED) {
+        // Cek kembali status pemutar sebelum memutar (mungkin sudah diputar manual)
+        if (player && typeof player.playVideo === 'function' && 
+            (player.getPlayerState() === YT.PlayerState.CUED || player.getPlayerState() === YT.PlayerState.PAUSED)) {
             player.playVideo();
         }
         autoTimeout = null;
@@ -409,7 +425,7 @@ function onPlayerStateChange(event) {
               if (isPlaylistMode) {
                   statusText.textContent = 'Status: Terdeteksi Video Hilang/Dibatasi. Otomatis LOMPAT ke video berikutnya...';
                   statusText.style.color = 'red';
-                  console.warn("[ERROR/SKIP] Video yang tidak dapat dimainkan/dihapus terdeteksi di playlist. Melompat ke yang berikutnya.");
+                  console.warn("[ERROR/SKIP] Video yang tidak dapat dimainkan/dihapus terdetksi di playlist. Melompat ke yang berikutnya.");
                   
                   setTimeout(() => {
                        if (player && typeof player.nextVideo === 'function') {
@@ -427,7 +443,7 @@ function onPlayerStateChange(event) {
          }
     }
 
-    if (isAutoMode && event.data === YT.PlayerState.CUED) {
+    if (isAutoMode && (event.data === YT.PlayerState.CUED || event.data === YT.PlayerState.PAUSED)) {
         startAutoPlaybackWithDelay();
     }
 
@@ -466,8 +482,10 @@ function onPlayerStateChange(event) {
                  }
              }, 3000); 
         } else {
-             statusText.textContent = 'Status: Dijeda secara manual. Klik "Nonaktifkan Otomatis" atau Putar di player.';
+             // Jika mode otomatis TIDAK aktif, ini adalah jeda manual
+             statusText.textContent = 'Status: Dijeda secara manual. Klik "Aktifkan Otomatis" atau Putar di player.';
              statusText.style.color = 'red';
+             btn.textContent = 'Aktifkan Otomatis';
         }
     } else if (event.data === YT.PlayerState.ENDED) {
         if (isAutoMode) {
@@ -589,11 +607,14 @@ function onPlayerStateChange(event) {
             btn.textContent = 'Aktifkan Otomatis';
         }
     } else if (event.data === YT.PlayerState.CUED) {
-         const text = isPlaylistMode ? 'Playlist dimuat.' : 'Video dimuat.';
-         statusText.textContent = `Status: ${text} Klik "Aktifkan Otomatis".`;
-         statusText.style.color = 'var(--warna-teks-muda)';
-         btn.textContent = 'Aktifkan Otomatis';
-         btn.disabled = false; 
+         // Biarkan loadContentFromUrl menangani pesan CUED, jika tidak, tampilkan default
+         if (!isAutoMode) {
+            const text = isPlaylistMode ? 'Playlist dimuat.' : 'Video dimuat.';
+            statusText.textContent = `Status: ${text} Klik "Aktifkan Otomatis".`;
+            statusText.style.color = 'var(--warna-teks-muda)';
+            btn.textContent = 'Aktifkan Otomatis';
+            btn.disabled = false; 
+         }
     }
 }
 
@@ -636,6 +657,7 @@ function toggleAutoPlayback(forceStart = false) {
         try {
              const currentUrl = player.getVideoUrl(); 
              const storedUrl = localStorage.getItem(LS_KEY_CONTENT_URL);
+             // Hanya simpan URL jika belum ada di penyimpanan lokal (untuk menghindari penimpaan playlist)
              if (currentUrl && !storedUrl) { 
                   localStorage.setItem(LS_KEY_CONTENT_URL, currentUrl);
              }
@@ -646,6 +668,7 @@ function toggleAutoPlayback(forceStart = false) {
         startAutoSessionReboot(); // Memulai REBOOT Otomatis
         startRandomInteraction(); 
         
+        // Jika status pemutar BUKAN playing (misal: paused, cued, unstarted)
         if (player.getPlayerState() !== YT.PlayerState.PLAYING) {
              startAutoPlaybackWithDelay();
         } else {
@@ -687,6 +710,7 @@ document.addEventListener('DOMContentLoaded', () => {
         stopAutoSessionReboot(); 
         stopRandomInteraction(); 
         localStorage.removeItem(LS_KEY_AUTO_MODE);
+        // Hapus juga URL yang tersimpan, karena akan diganti dengan yang baru
         localStorage.removeItem(LS_KEY_CONTENT_URL); 
         
         const loaded = loadContentFromUrl(url);
