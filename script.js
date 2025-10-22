@@ -111,21 +111,27 @@ function onPlayerReady(event) {
     }
 }
 
-// --- FUNGSI SCROLL & INTERAKSI OTOMATIS ---
+// --- FUNGSI SCROLL & INTERAKSI OTOMATIS (Ditambahkan log debugging) ---
 
 function startAutoScroll() {
     // JANGAN SCROLL JIKA DALAM MODE VERTIKAL (Shorts)
     if (isShortsMode()) { 
         stopAutoScroll(); 
-        console.log("Scroll Otomatis dilewati karena mode vertikal (Shorts).");
+        console.log("[SCROLL] Scroll Otomatis dilewati karena mode vertikal (Shorts).");
         return; 
     }
 
     if (scrollInterval) clearInterval(scrollInterval);
+    console.log(`[SCROLL] Memulai Scroll Otomatis. Interval: ${SCROLL_INTERVAL_MS}ms.`); 
+    
     scrollInterval = setInterval(() => {
-        if (!isAutoMode) return;
+        if (!isAutoMode) {
+             console.log("[SCROLL] Dihentikan di dalam interval: isAutoMode false.");
+             return;
+        }
         const scrollDistance = Math.floor(Math.random() * 401) - 200; 
         window.scrollBy({ top: scrollDistance, behavior: 'smooth' });
+        console.log(`[SCROLL] Gulir sebesar: ${scrollDistance}px`); 
     }, SCROLL_INTERVAL_MS);
 }
 
@@ -133,16 +139,18 @@ function stopAutoScroll() {
     if (scrollInterval) {
         clearInterval(scrollInterval);
         scrollInterval = null;
+        console.log("[SCROLL] Scroll Otomatis dihentikan."); 
     }
 }
+
 
 // FUNGSI INTERAKSI DIREVISI: Variasi berdasarkan durasi video
 function startRandomInteraction() {
     if (randomInteractionInterval) clearInterval(randomInteractionInterval);
     
     // Interval acak standar (5-10 menit)
-    const baseInterval = Math.floor(Math.random() * (INTERACTION_INTERVAL_MS_MAX - INTERACTION_INTERVAL_MS_MIN + 1)) + INTERACTION_INTERVAL_MS_MIN;
-    let finalInterval = baseInterval;
+    const INTERACTION_INTERVAL_MS_MIN_RANDOM = Math.floor(Math.random() * (INTERACTION_INTERVAL_MS_MAX - INTERACTION_INTERVAL_MS_MIN + 1)) + INTERACTION_INTERVAL_MS_MIN;
+    let finalInterval = INTERACTION_INTERVAL_MS_MIN_RANDOM;
 
     // JIKA Shorts/Video Pendek, percepat interval (misalnya, 1-3 menit)
     try {
@@ -220,7 +228,7 @@ function stopRandomInteraction() {
     }
 }
 
-// --- FUNGSI BATAS WAKTU SESI OTOMATIS (AUTO-REFRESH) ---
+// --- FUNGSI BATAS WAKTU SESI OTOMATIS (AUTO-REFRESH PENUH) ---
 function startAutoSessionTimeout() {
     if (sessionTimeout) clearTimeout(sessionTimeout);
     
@@ -240,18 +248,22 @@ function startAutoSessionTimeout() {
 
         localStorage.setItem(LS_KEY_CONTENT_URL, currentContentUrl);
 
-        alert(`
-            Sesi otomatis telah berjalan selama ${hours} jam. 
-            
-            Memuat ulang halaman untuk sesi baru.
-            
-            PENTING: Untuk meningkatkan validitas, ini adalah saat yang tepat untuk:
-            1. Mengubah alamat IP Anda (misalnya, ganti VPN/Proxy).
-            2. Memastikan Anda masuk dengan akun penonton yang berbeda (jika menggunakan login).
+        // PENGGANTIAN ALERT() DENGAN CONSOLE.WARN() DAN AUTO-RELOAD
+        console.warn(`
+            [PENTING - AUTO REFRESH] Sesi otomatis telah berjalan selama ${hours} jam. 
+            Memuat ulang halaman (Reload) untuk sesi baru dalam 3 detik!
+
+            TINDAKAN MANUAL (OPSIONAL):
+            1. Ubah alamat IP Anda (VPN/Proxy)
+            2. Ubah akun penonton (jika menggunakan login)
         `);
+
+        // Beri jeda kecil (3 detik) agar pesan di konsol sempat terlihat
+        setTimeout(() => {
+            window.location.reload(); 
+        }, 3000); 
         
-        window.location.reload(); 
-    }, SESSION_TIMEOUT_MS);
+    }, SESSION_TIMEOUT_MS); // Batas waktu 6 jam
 }
 
 // FUNGSI DIREVISI: Ditambahkan pembersihan Local Storage secara eksplisit
@@ -264,9 +276,6 @@ function stopAutoSessionTimeout() {
         clearTimeout(startDelayTimeout);
         startDelayTimeout = null;
     }
-    // HANYA HAPUS JIKA AUTO MODE DIMATIKAN SECARA MANUAL (Logika pembersihan dipindahkan ke toggleAutoPlayback)
-    // localStorage.removeItem(LS_KEY_AUTO_MODE);
-    // localStorage.removeItem(LS_KEY_CONTENT_URL); 
 }
 
 // FUNGSI DIREVISI: Menambahkan logika Shorts/Video Pendek yang lebih cepat
@@ -279,18 +288,44 @@ function onPlayerStateChange(event) {
         autoTimeout = null;
     }
     
-    // Pengecekan Error API
-    if (event.data === YT.PlayerState.UNSTARTED && event.target.getVideoUrl() && event.target.getDuration() === 0) {
-         statusText.textContent = 'Status: ERROR. Video/Playlist tidak dapat diputar di embed (Pembatasan/Tidak Tersedia).';
-         statusText.style.color = 'red';
-         isAutoMode = false;
-         stopAutoScroll();
-         stopAutoSessionTimeout();
-         stopRandomInteraction(); 
-         btn.textContent = 'Aktifkan Otomatis';
-         btn.disabled = true; 
-         return; 
+    // =================================================================
+    // REVISI BARU: Penanganan Video Hilang/Dibatasi di Playlist (SKIP)
+    // =================================================================
+    if (event.data === YT.PlayerState.UNSTARTED) {
+         // Kondisi video tidak dapat dimainkan/dihapus (durasi 0)
+         const isUnplayable = event.target.getVideoUrl() && event.target.getDuration() === 0;
+
+         if (isUnplayable) {
+              if (isPlaylistMode) {
+                  // Jika dalam mode playlist dan video tidak dapat dimainkan, LOMPAT!
+                  statusText.textContent = 'Status: Terdeteksi Video Hilang/Dibatasi. Otomatis LOMPAT ke video berikutnya...';
+                  statusText.style.color = 'red';
+                  console.warn("[ERROR/SKIP] Video yang tidak dapat dimainkan/dihapus terdeteksi di playlist. Melompat ke yang berikutnya.");
+                  
+                  // Beri waktu sejenak (1 detik) sebelum melompat
+                  setTimeout(() => {
+                       if (player && typeof player.nextVideo === 'function') {
+                            player.nextVideo();
+                       }
+                  }, 1000);
+                  
+                  return; // Jangan matikan mode otomatis, lanjutkan loop
+                  
+              } else {
+                  // Ini adalah video tunggal yang dibatasi/dihapus, matikan mode otomatis
+                  statusText.textContent = 'Status: ERROR. Video Tunggal tidak dapat diputar (Dihapus/Dibatasi).';
+                  statusText.style.color = 'red';
+                  isAutoMode = false;
+                  stopAutoScroll();
+                  stopAutoSessionTimeout();
+                  stopRandomInteraction(); 
+                  btn.textContent = 'Aktifkan Otomatis';
+                  btn.disabled = true; 
+                  return; 
+              }
+         }
     }
+    // =================================================================
 
     if (isAutoMode && event.data === YT.PlayerState.CUED) {
         startAutoPlaybackWithDelay();
@@ -344,7 +379,7 @@ function onPlayerStateChange(event) {
             } catch(e) { /* Abaikan */ }
             
             if (isShorts || isShortsMode()) {
-                 // **LOGIKA BARU UNTUK SHORTS/VIDEO PENDEK (Simulasi Swipe Cepat)**
+                 // LOGIKA BARU UNTUK SHORTS/VIDEO PENDEK (Simulasi Swipe Cepat)
                  const randomShortsDelay = Math.floor(Math.random() * (3000 - 500 + 1)) + 500; // 0.5 to 3 seconds
                  
                  statusText.textContent = `Status: Selesai (Shorts/Pendek). Otomatis memuat berikutnya dalam ${Math.ceil(randomShortsDelay / 1000)} detik...`;
