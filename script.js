@@ -2,14 +2,14 @@
 const SHORTS_MAX_DURATION_SECONDS = 60; // Definisi maksimal durasi Shorts
 const LS_KEY_AUTO_MODE = 'auto_watch_mode';
 const LS_KEY_CONTENT_URL = 'auto_watch_url';
-const SCROLL_INTERVAL_MS = 10000; // Interval scroll setiap 10 detik
+// CATATAN: SCROLL_INTERVAL_MS DIHAPUS, SEKARANG DIHITUNG DINAMIS
 
 let player;
 let isAutoMode = false;
 let autoTimeout = null; // Timeout untuk penundaan pemutaran
 let breakResumeTimeout = null; // Timeout untuk jeda interaksi
-let scrollInterval = null; // Interval untuk gulir acak
-let interactionInterval = null; // Interval untuk interaksi acak
+let scrollInterval = null; // Interval untuk gulir acak (Sekarang berupa setTimeout ID)
+let interactionInterval = null; // Interval untuk interaksi acak (Sekarang berupa setTimeout ID)
 let sessionTimeout = null; // Timeout untuk durasi sesi
 let currentVideoId = ''; // Menyimpan ID video yang saat ini dimuat
 let isPlaylistMode = false; // Menyimpan apakah sedang memutar playlist/channel
@@ -29,12 +29,13 @@ function extractPlaylistId(url) {
 }
 
 function getRandomQuality() {
+    // Kualitas acak untuk naturalness
     const qualities = ['small', 'medium', 'large', 'hd720'];
     return qualities[Math.floor(Math.random() * qualities.length)];
 }
 
 function getRandomPlaybackRate() {
-    // Kecepatan yang didukung API: 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2
+    // Kecepatan acak untuk naturalness
     const rates = [0.75, 1.0, 1.25];
     return rates[Math.floor(Math.random() * rates.length)];
 }
@@ -46,75 +47,95 @@ function isShortsMode() {
 }
 
 
-// --- KONTROL SCROLL (GULIR) ---
+// --- KONTROL SCROLL (GULIR) - OPTIMASI INTERVAL DINAMIS ---
 
-// FUNGSI INI KINI BERLAKU UNTUK SEMUA JENIS KONTEN
 function startAutoScroll() {
-    // Pengecekan Shorts dihapus, scroll berlaku untuk semua mode
-    if (scrollInterval) clearInterval(scrollInterval);
-    console.log(`[SCROLL] Memulai Scroll Otomatis. Interval: ${SCROLL_INTERVAL_MS}ms. (Aktif untuk semua konten)`); 
+    // Gunakan clearTimeout karena sekarang menggunakan setTimeout rekursif
+    if (scrollInterval) clearTimeout(scrollInterval);
     
-    scrollInterval = setInterval(() => {
+    // Interval scroll acak pertama (8 - 15 detik)
+    const randomInterval = Math.floor(Math.random() * (15000 - 8000 + 1)) + 8000; 
+
+    console.log(`[SCROLL] Memulai Scroll Otomatis. Interval Awal: ${randomInterval}ms.`); 
+    
+    // Fungsi rekursif untuk interval yang dinamis
+    const scheduleScroll = () => {
         if (!isAutoMode) {
              console.log("[SCROLL] Dihentikan di dalam interval: isAutoMode false.");
+             scrollInterval = null; 
              return;
         }
-        // Jarak gulir acak antara -200px dan +200px
+        
+        // 1. Lakukan aksi scroll
+        // Jarak gulir acak antara -200px dan +200px (Natural)
         const scrollDistance = Math.floor(Math.random() * 401) - 200; 
         window.scrollBy({ top: scrollDistance, behavior: 'smooth' });
         console.log(`[SCROLL] Gulir sebesar: ${scrollDistance}px`); 
-    }, SCROLL_INTERVAL_MS);
+        
+        // 2. Tentukan interval acak berikutnya (8 - 15 detik)
+        const nextInterval = Math.floor(Math.random() * (15000 - 8000 + 1)) + 8000; 
+        
+        // 3. Jadwalkan panggilan berikutnya
+        scrollInterval = setTimeout(scheduleScroll, nextInterval);
+    };
+
+    // Panggil pertama kali
+    scheduleScroll();
 }
 
 function stopAutoScroll() {
     if (scrollInterval) {
-        clearInterval(scrollInterval);
+        clearTimeout(scrollInterval);
         scrollInterval = null;
         console.log("[SCROLL] Scroll Otomatis Dihentikan.");
     }
 }
 
-// --- KONTROL INTERAKSI (Simulasi Mouse Move/Click) ---
+// --- KONTROL INTERAKSI (Simulasi Mouse Move/Click) - OPTIMASI INTERVAL DINAMIS ---
 
 function startRandomInteraction() {
-    if (interactionInterval) clearInterval(interactionInterval);
+    if (interactionInterval) clearTimeout(interactionInterval);
 
-    const interactionIntervalMs = 15000; // Setiap 15 detik
+    // Interval dasar pertama untuk mencoba interaksi (Acak 10-25 detik)
+    const baseIntervalMs = Math.floor(Math.random() * (25000 - 10000 + 1)) + 10000; 
 
-    interactionInterval = setInterval(() => {
-        if (!isAutoMode) return;
+    console.log(`[INTERAKSI] Memulai Interaksi Acak. Interval Awal: ${baseIntervalMs}ms.`); 
+
+    const scheduleInteraction = () => {
+        if (!isAutoMode) {
+            interactionInterval = null;
+            return;
+        }
         
-        // Randomly decide to do an action (e.g., 10% chance per interval)
-        const shouldInteract = Math.random() < 0.1;
-        
+        // Peluang Interaksi: 15% setiap interval
+        const shouldInteract = Math.random() < 0.15; 
+
         if (shouldInteract) {
-            // Kita akan mensimulasikan gerakan mouse di atas player
-            const playerRect = document.getElementById('player').getBoundingClientRect();
             
-            // Koordinat acak di dalam player
+            // 1. Simulasi gerakan mouse di atas player
+            const playerRect = document.getElementById('player').getBoundingClientRect();
             const x = playerRect.left + Math.random() * playerRect.width;
             const y = playerRect.top + Math.random() * playerRect.height;
-
-            // Membuat event mouse
             const event = new MouseEvent('mousemove', {
-                view: window,
-                bubbles: true,
-                cancelable: true,
-                clientX: x,
-                clientY: y
+                view: window, bubbles: true, cancelable: true, clientX: x, clientY: y
             });
             
-            document.getElementById('player').dispatchEvent(event);
+            // Tambahkan simulasi mouseout dan mouseenter (lebih alami)
+            const playerDiv = document.getElementById('player');
+            playerDiv.dispatchEvent(new MouseEvent('mouseout', { view: window, bubbles: true }));
+            playerDiv.dispatchEvent(event);
+            playerDiv.dispatchEvent(new MouseEvent('mouseenter', { view: window, bubbles: true }));
+
             lastInteractedAt = Date.now();
             console.log("[INTERAKSI] Mouse move acak disimulasikan.");
 
-            // Terkadang, mensimulasikan klik untuk jeda/lanjut singkat (opsional)
-            if (Math.random() < 0.2 && player.getPlayerState() === YT.PlayerState.PLAYING) {
+            // 2. Terkadang, mensimulasikan jeda/lanjut singkat (25% kemungkinan)
+            if (Math.random() < 0.25 && player.getPlayerState() === YT.PlayerState.PLAYING) {
                 
                  if (breakResumeTimeout) clearTimeout(breakResumeTimeout);
                  
-                 // Jeda 5-10 detik
-                 const breakDuration = Math.floor(Math.random() * (10000 - 5000 + 1)) + 5000;
+                 // Jeda 5-15 detik (Lebih bervariasi)
+                 const breakDuration = Math.floor(Math.random() * (15000 - 5000 + 1)) + 5000;
                  player.pauseVideo();
                  console.log(`[INTERAKSI] Jeda singkat disimulasikan selama ${Math.ceil(breakDuration/1000)} detik.`);
                  
@@ -126,40 +147,66 @@ function startRandomInteraction() {
             }
         }
         
-    }, interactionIntervalMs);
+        // 3. Tentukan interval acak berikutnya (10 - 25 detik)
+        const nextInterval = Math.floor(Math.random() * (25000 - 10000 + 1)) + 10000; 
+        
+        // 4. Jadwalkan panggilan berikutnya
+        interactionInterval = setTimeout(scheduleInteraction, nextInterval);
+    };
+
+    // Panggil pertama kali
+    scheduleInteraction();
 }
 
 function stopRandomInteraction() {
     if (interactionInterval) {
-        clearInterval(interactionInterval);
+        clearTimeout(interactionInterval);
         interactionInterval = null;
         console.log("[INTERAKSI] Interaksi Acak Dihentikan.");
     }
 }
 
 
-// --- KONTROL SESI ---
+// --- KONTROL SESI (Diubah menjadi Reboot Sesi Otomatis) ---
 
-function startAutoSessionTimeout() {
+// REVISI: Mengubah timeout menjadi REBOOT berkelanjutan
+function startAutoSessionReboot() {
     if (sessionTimeout) clearTimeout(sessionTimeout);
 
-    // Sesi 10-60 menit (600000ms hingga 3600000ms)
+    // Sesi 10-60 menit (600000ms hingga 3600000ms) - Dipertahankan untuk simulasi wajar
     const sessionDuration = Math.floor(Math.random() * (3600000 - 600000 + 1)) + 600000; 
     const sessionHours = Math.floor(sessionDuration / 3600000);
     const sessionMinutes = Math.round((sessionDuration % 3600000) / 60000);
     
-    console.log(`[SESI] Sesi Otomatis akan berakhir dalam: ${sessionHours} jam ${sessionMinutes} menit.`);
+    console.log(`[SESI] Sesi Otomatis akan REBOOT dalam: ${sessionHours} jam ${sessionMinutes} menit.`);
 
     sessionTimeout = setTimeout(() => {
-        toggleAutoPlayback(); // Mematikan mode otomatis
+        
+        console.log("[SESI] Timeout sesi tercapai. Melakukan REBOOT otomatis.");
+        
+        // 1. Hentikan interval lama
+        stopAutoScroll();
+        stopRandomInteraction(); 
+        
+        // 2. Perbarui status
         const statusText = document.getElementById('status-text');
-        statusText.textContent = `Status: Sesi Otomatis berakhir setelah ${sessionHours} jam ${sessionMinutes} menit.`;
-        statusText.style.color = 'red';
-        alert(`Sesi menonton otomatis telah berakhir (Durasi: ${sessionHours} jam ${sessionMinutes} menit).`);
+        statusText.textContent = `Status: Sesi reboot otomatis setelah ${sessionHours} jam ${sessionMinutes} menit.`;
+        statusText.style.color = 'orange';
+
+        // 3. Mulai ulang semua interval dan timeout (Reboot)
+        startAutoScroll();
+        startRandomInteraction(); 
+        startAutoSessionReboot(); // <-- REKURENSI: Mulai timer untuk sesi berikutnya!
+        
+        // 4. Pastikan pemutaran dilanjutkan
+        if (player && player.getPlayerState() !== YT.PlayerState.PLAYING) {
+             player.playVideo();
+        }
+        
     }, sessionDuration);
 }
 
-function stopAutoSessionTimeout() {
+function stopAutoSessionReboot() {
     if (sessionTimeout) {
         clearTimeout(sessionTimeout);
         sessionTimeout = null;
@@ -168,7 +215,7 @@ function stopAutoSessionTimeout() {
 }
 
 
-// --- FUNGSI UTAMA UNTUK MUAT KONTEN DIREVISI ---
+// --- FUNGSI UTAMA UNTUK MUAT KONTEN ---
 function loadContentFromUrl(url, fromAutoStart = false) {
     const statusText = document.getElementById('status-text');
     const watchBtn = document.getElementById('start-watch-btn');
@@ -177,7 +224,6 @@ function loadContentFromUrl(url, fromAutoStart = false) {
     const newVideoId = extractVideoId(url);
     const newPlaylistId = extractPlaylistId(url);
     
-    // Pengecekan Kesiapan Pemutar yang Lebih Baik
     if (!player || typeof player.loadPlaylist !== 'function') {
         if (!fromAutoStart) {
              alert("Pemutar belum siap. Harap tunggu sebentar.");
@@ -197,11 +243,9 @@ function loadContentFromUrl(url, fromAutoStart = false) {
             listType: 'playlist',
             index: 0,
             suggestedQuality: getRandomQuality(),
-            shuffle: true // REVISI: Memastikan playlist apa pun dimulai dalam mode acak
+            shuffle: true 
         });
-        // **PENTING: SET KECEPATAN SETELAH LOAD**
         player.setPlaybackRate(getRandomPlaybackRate());
-
 
         statusText.textContent = fromAutoStart ? 'Status: Playlist otomatis dimuat ulang (Acak).' : 'Status: Playlist dimuat (Acak). Klik "Aktifkan Otomatis".';
         
@@ -209,9 +253,7 @@ function loadContentFromUrl(url, fromAutoStart = false) {
         currentVideoId = newVideoId;
         isPlaylistMode = false;
         
-        // Cek jika ini adalah Shorts, dan atur tata letak
         if (url.includes('shorts/') || (newVideoId.length === 11 && (url.includes('t=')) && (url.includes('youtube.com/')))) {
-             // Asumsi cepat: Jika dari URL shorts/, anggap sebagai mode Shorts (Vertikal)
              playerDiv.classList.add('player-vertical');
         }
         
@@ -220,8 +262,6 @@ function loadContentFromUrl(url, fromAutoStart = false) {
             startSeconds: 0,
             suggestedQuality: getRandomQuality()
         });
-        
-        // **PENTING: SET KECEPATAN SETELAH LOAD**
         player.setPlaybackRate(getRandomPlaybackRate());
         
         statusText.textContent = fromAutoStart ? 'Status: Video otomatis dimuat ulang.' : 'Status: Video Tunggal dimuat. Klik "Aktifkan Otomatis".';
@@ -283,7 +323,7 @@ function onPlayerReady(event) {
 }
 
 function startAutoPlaybackWithDelay() {
-    // Penundaan acak sebelum pemutaran (2-5 detik)
+    // Penundaan acak sebelum pemutaran (2-5 detik untuk naturalness)
     const randomDelay = Math.floor(Math.random() * (5000 - 2000 + 1)) + 2000;
     
     if (autoTimeout) clearTimeout(autoTimeout);
@@ -311,10 +351,6 @@ function resetAndPlayVideo() {
          });
          player.setPlaybackRate(getRandomPlaybackRate());
          
-         // Langsung putar setelah dimuat ulang (mode CUED akan mengaktifkan startAutoPlaybackWithDelay)
-         // Jika perlu segera, gunakan playVideo()
-         // player.playVideo(); 
-         
          const statusText = document.getElementById('status-text');
          statusText.textContent = `Status: Video Tunggal dimuat ulang.`;
          statusText.style.color = 'green';
@@ -333,10 +369,6 @@ function onPlayerError(event) {
     const statusText = document.getElementById('status-text');
     let errorMessage = '';
 
-    // Referensi Kode Kesalahan YouTube:
-    // 100: Video not found or embedded playback disabled
-    // 101/150: Video embedding disabled for requested content
-    
     if (event.data === 100 || event.data === 101 || event.data === 150) {
          errorMessage = 'Video tidak tersedia atau pemutaran disematkan dilarang.';
     } else if (event.data === 2) {
@@ -352,7 +384,7 @@ function onPlayerError(event) {
     // Hentikan mode otomatis saat terjadi kesalahan serius
     isAutoMode = false;
     stopAutoScroll();
-    stopAutoSessionTimeout();
+    stopAutoSessionReboot(); 
     stopRandomInteraction(); 
     localStorage.removeItem(LS_KEY_AUTO_MODE);
     document.getElementById('start-watch-btn').textContent = 'Aktifkan Otomatis';
@@ -388,14 +420,8 @@ function onPlayerStateChange(event) {
                   return;
                   
               } else {
-                  statusText.textContent = 'Status: ERROR. Video Tunggal tidak dapat diputar (Dihapus/Dibatasi).';
-                  statusText.style.color = 'red';
-                  isAutoMode = false;
-                  stopAutoScroll();
-                  stopAutoSessionTimeout();
-                  stopRandomInteraction(); 
-                  btn.textContent = 'Aktifkan Otomatis';
-                  btn.disabled = true; 
+                  // Jika video tunggal hilang, hentikan karena tidak bisa melanjutkan
+                  onPlayerError({data: 100}); 
                   return; 
               }
          }
@@ -480,13 +506,12 @@ function onPlayerStateChange(event) {
 
                     if (autoTimeout) clearTimeout(autoTimeout); 
                     
-                    // PENYEMPURNAAN 1: WAKTU TUNGGU CHANNEL SWITCH ACAK (3-8 detik)
+                    // WAKTU TUNGGU CHANNEL SWITCH ACAK (3-8 detik untuk naturalness)
                     const randomChannelSwitchDelay = Math.floor(Math.random() * (8000 - 3000 + 1)) + 3000;
                     
                     statusText.textContent = `Status: Video Tunggal Selesai. Otomatis beralih ke video acak Channel (${currentVideoData.author}) dalam ${Math.ceil(randomChannelSwitchDelay / 1000)} detik...`;
                     statusText.style.color = 'blue';
 
-                    // Beri jeda acak (mensimulasikan jeda berpikir)
                     autoTimeout = setTimeout(() => {
                         if (player && typeof player.loadPlaylist === 'function') {
                              isPlaylistMode = true; 
@@ -503,35 +528,58 @@ function onPlayerStateChange(event) {
                              statusText.textContent = `Status: Otomatis AKTIF. Memuat playlist acak dari Channel: ${authorName}.`;
                              
                         } else {
-                            resetAndPlayVideo(); 
+                            // Fallback jika gagal loadPlaylist, panggil logika gagal (Tunggu Alami)
+                            onPlayerStateChange({data: YT.PlayerState.ENDED, target: player});
                         }
                     }, randomChannelSwitchDelay); 
                     
                 } else {
-                    // Fallback jika metadata channel tidak tersedia (kembali ke putar ulang)
-                    console.log("[Channel Mode] Gagal mendapatkan ID Channel atau metadata. Memutar ulang video tunggal.");
-                    const randomReplayDelay = Math.floor(Math.random() * (30000 - 15000 + 1)) + 15000; 
+                    // REVISI NATURAL: Fallback jika metadata channel tidak tersedia (TUNGGU LAMA DI LAYAR SARAN)
+                    console.log("[Channel Mode] Gagal mendapatkan ID Channel atau metadata. Menunggu di layar saran.");
                     
-                    statusText.textContent = `Status: Selesai. Otomatis akan memutar ulang dalam ${Math.ceil(randomReplayDelay / 1000)} detik...`;
-                    statusText.style.color = 'red';
+                    // Jeda yang lebih lama (30-90 detik) untuk melihat layar saran video (Sangat Natural)
+                    const randomWaitDelay = Math.floor(Math.random() * (90000 - 30000 + 1)) + 30000; 
                     
+                    statusText.textContent = `Status: Gagal beralih ke Channel. Menonton saran selama ${Math.ceil(randomWaitDelay / 1000)} detik... Otomatis akan memutar ulang.`;
+                    statusText.style.color = 'orange';
+
                     autoTimeout = setTimeout(() => {
+                        console.log("[Channel Mode] Waktu tunggu layar saran selesai. Memutar ulang video tunggal sebagai upaya terakhir.");
                         resetAndPlayVideo(); 
-                    }, randomReplayDelay);
+                        
+                    }, randomWaitDelay);
                 }
                 
             } else {
                  // Logika Playlist Video Panjang
                  
-                 // PENYEMPURNAAN 2: WAKTU TUNGGU PLAYLIST END ACAK (3-10 detik)
+                 // WAKTU TUNGGU PLAYLIST END ACAK (3-10 detik untuk naturalness)
                  const randomPlaylistEndDelay = Math.floor(Math.random() * (10000 - 3000 + 1)) + 3000;
                  
-                 statusText.textContent = `Status: Playlist Otomatis Selesai. Memuat ulang video pertama dalam ${Math.ceil(randomPlaylistEndDelay / 1000)} detik...`;
+                 statusText.textContent = `Status: Playlist Otomatis Selesai. Memuat ulang acak dalam ${Math.ceil(randomPlaylistEndDelay / 1000)} detik...`;
                  statusText.style.color = 'orange';
 
                  autoTimeout = setTimeout(() => {
-                    if (player && typeof player.playVideoAt === 'function') {
-                         player.playVideoAt(0);
+                    if (player && typeof player.loadPlaylist === 'function') {
+                         
+                         // Muat ulang playlist dengan mode acak (menggunakan URL tersimpan)
+                         const storedUrl = localStorage.getItem(LS_KEY_CONTENT_URL);
+                         const newPlaylistId = extractPlaylistId(storedUrl);
+
+                         if (newPlaylistId) {
+                             player.loadPlaylist({
+                                 list: newPlaylistId,
+                                 listType: 'playlist',
+                                 index: 0,
+                                 shuffle: true, // PENTING: Aktifkan mode acak
+                                 suggestedQuality: getRandomQuality()
+                             });
+                             statusText.textContent = `Status: Otomatis AKTIF. Playlist dimuat ulang (Acak).`;
+                         } else {
+                            // Fallback jika gagal dapat ID Playlist, coba putar ulang dari awal (kurang acak tapi aman)
+                            player.playVideoAt(0);
+                         }
+
                     }
                  }, randomPlaylistEndDelay); 
             }
@@ -556,7 +604,6 @@ function toggleAutoPlayback(forceStart = false) {
     const statusText = document.getElementById('status-text');
     const btn = document.getElementById('start-watch-btn');
     
-    // Pengecekan Kesiapan Pemutar yang Lebih Baik
     if (!player || typeof player.getPlayerState !== 'function') {
          statusText.textContent = 'Status: Pemutar belum siap atau video belum dimuat.';
          statusText.style.color = 'red';
@@ -568,7 +615,7 @@ function toggleAutoPlayback(forceStart = false) {
         isAutoMode = false;
         player.pauseVideo();
         stopAutoScroll();
-        stopAutoSessionTimeout();
+        stopAutoSessionReboot(); 
         stopRandomInteraction(); 
         
         localStorage.setItem(LS_KEY_AUTO_MODE, 'false');
@@ -587,22 +634,21 @@ function toggleAutoPlayback(forceStart = false) {
         // Simpan status dan URL terakhir ke localStorage
         localStorage.setItem(LS_KEY_AUTO_MODE, 'true');
         try {
-             const currentUrl = player.getVideoUrl(); // URL video tunggal saat ini
-             if (currentUrl) {
+             const currentUrl = player.getVideoUrl(); 
+             const storedUrl = localStorage.getItem(LS_KEY_CONTENT_URL);
+             if (currentUrl && !storedUrl) { 
                   localStorage.setItem(LS_KEY_CONTENT_URL, currentUrl);
              }
         } catch(e) { /* Abaikan */ }
         
         // Memulai semua interval dan timeout
         startAutoScroll();
-        startAutoSessionTimeout();
+        startAutoSessionReboot(); // Memulai REBOOT Otomatis
         startRandomInteraction(); 
         
         if (player.getPlayerState() !== YT.PlayerState.PLAYING) {
-             // Jika dijeda/dihentikan, putar (dengan penundaan)
              startAutoPlaybackWithDelay();
         } else {
-             // Jika sudah diputar, perbarui status
              statusText.textContent = 'Status: Otomatis AKTIF. Video sedang diputar.';
              statusText.style.color = 'green';
         }
@@ -638,10 +684,10 @@ document.addEventListener('DOMContentLoaded', () => {
         isAutoMode = false; 
         if (autoTimeout) clearTimeout(autoTimeout);
         stopAutoScroll();
-        stopAutoSessionTimeout();
+        stopAutoSessionReboot(); 
         stopRandomInteraction(); 
         localStorage.removeItem(LS_KEY_AUTO_MODE);
-        localStorage.removeItem(LS_KEY_CONTENT_URL);
+        localStorage.removeItem(LS_KEY_CONTENT_URL); 
         
         const loaded = loadContentFromUrl(url);
         if (loaded) {
