@@ -472,15 +472,29 @@ function onPlayerStateChange(event) {
         if (breakResumeTimeout) {
              // Biarkan pesan interupsi yang direncanakan tetap muncul
         } else if (isAutoMode) { 
-             statusText.textContent = 'Status: Terdeteksi Jeda Tidak Terduga. Memulai kembali dalam 3 detik...';
+             
+             // --- PERBAIKAN LOGIKA ADSENSE/JEDA TAK TERDUGA (Lebih Bersabar) ---
+             
+             // Tentukan penundaan acak yang lebih panjang (misalnya 10 hingga 15 detik) 
+             // untuk memberikan waktu iklan berjalan atau menunggu tombol "Lewati Iklan" ditekan.
+             const adsWaitDelay = Math.floor(Math.random() * (15000 - 10000 + 1)) + 10000;
+             const waitSeconds = Math.ceil(adsWaitDelay / 1000);
+
+             statusText.textContent = `Status: Terdeteksi Jeda Tak Terduga (Kemungkinan Iklan). Melanjutkan dalam ${waitSeconds} detik...`;
              statusText.style.color = 'orange';
              
              if (autoTimeout) clearTimeout(autoTimeout);
              autoTimeout = setTimeout(() => {
+                 // Cek lagi apakah masih dijeda, lalu putar
                  if (player && typeof player.getPlayerState === 'function' && player.getPlayerState() === YT.PlayerState.PAUSED) {
                       player.playVideo();
+                      console.log("[ADSENSE/PAUSE] Jeda diselesaikan. Pemutaran dilanjutkan.");
                  }
-             }, 3000); 
+                 autoTimeout = null;
+             }, adsWaitDelay); 
+
+             // -------------------------------------------------------------------
+
         } else {
              // Jika mode otomatis TIDAK aktif, ini adalah jeda manual
              statusText.textContent = 'Status: Dijeda secara manual. Klik "Aktifkan Otomatis" atau Putar di player.';
